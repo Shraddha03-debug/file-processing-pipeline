@@ -1,0 +1,9 @@
+function.zip
+*.pyc
+__pycache__/
+.env
+output.json
+test-file.txt
+.aws-sam/
+node_modules/
+*.log
