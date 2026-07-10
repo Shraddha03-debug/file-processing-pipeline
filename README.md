@@ -8,12 +8,6 @@ Built and tested locally using a Docker-based AWS emulator (since I didn't want 
 
 You upload a file to an S3 bucket. That upload triggers an event to SQS, which wakes up a Lambda function, which reads the file's metadata and writes a record to DynamoDB. That's it — no polling, no server, everything reacts to the previous step.
 
-```
-File upload → S3 → SQS → Lambda → DynamoDB
-                                      ↓
-                              CloudWatch (logs)
-```
-
 ## Why I built this
 
 I wanted to actually understand serverless/event-driven design instead of just reading about it — how S3 event notifications work, how SQS decouples things, how Lambda's event source mapping polls a queue, and how IAM roles tie it all together with least-privilege permissions. Debugging it (see below) taught me more than the initial build did.
@@ -24,26 +18,13 @@ I wanted to actually understand serverless/event-driven design instead of just r
 - Python 3.12 (Lambda handler)
 - Docker + a local AWS emulator for testing everything without touching real AWS
 
-## Repo structure
 
-```
-file-processing-pipeline/
-├── config/
-│   ├── trust-policy.json          → who's allowed to assume the Lambda role
-│   ├── lambda-permissions.json    → what the Lambda role can actually do
-│   ├── attributes.json            → lets S3 send messages into the SQS queue
-│   ├── notification.json          → tells S3 to notify SQS on new uploads
-│   └── queue-policy.json
-├── lambda/
-│   └── handler.py                 → the actual processing logic
-└── .gitignore
-```
 
 ## Running it locally
 
 Everything below points at `localhost:4566`, where the local emulator serves S3/SQS/Lambda/DynamoDB.
 
-```bash
+bash
 # point the AWS CLI at the local emulator
 set AWS_ENDPOINT_URL=http://localhost:4566
 set AWS_ACCESS_KEY_ID=test
@@ -76,18 +57,18 @@ aws lambda create-function --function-name file-processing-pipeline-processor --
 
 # hook the queue up to the Lambda
 aws lambda create-event-source-mapping --function-name file-processing-pipeline-processor --event-source-arn arn:aws:sqs:us-east-1:000000000000:file-processing-pipeline-queue --batch-size 5
-```
+
 
 Then test it:
 
-```bash
+bash
 aws s3 cp test-file.txt s3://file-processing-pipeline-incoming/
 aws dynamodb scan --table-name file-processing-pipeline-results
-```
+
 
 ## What actually shows up in DynamoDB
 
-```json
+json
 {
   "file_id": "c1169561-67e4-4e1e-848f-0bd40938d1ed",
   "bucket": "file-processing-pipeline-incoming",
@@ -96,7 +77,7 @@ aws dynamodb scan --table-name file-processing-pipeline-results
   "status": "PROCESSED",
   "processed_at": 1783669064
 }
-```
+
 
 ## The debugging part (the part I actually learned from)
 
